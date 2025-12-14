@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
@@ -34,7 +35,6 @@ local function updateBoss()
     end
 end
 
--- Check when boss is added again
 Workspace.ChildAdded:Connect(function(child)
     if child.Name == "SamBoss" then
         task.wait(0.1)
@@ -42,24 +42,22 @@ Workspace.ChildAdded:Connect(function(child)
     end
 end)
 
--- Also update if boss is removed (dies)
 Workspace.ChildRemoved:Connect(function(child)
     if child.Name == "SamBoss" then
         targetRootPart = nil
     end
 end)
 
--- Initial check
 updateBoss()
 
 --------------------------------------------------
--- GUI (PERSISTENT)
+-- GUI (DRAGGABLE + PERSISTENT)
 --------------------------------------------------
 local function createGui()
     local playerGui = player:WaitForChild("PlayerGui")
 
     if playerGui:FindFirstChild("LookAtGui") then
-        return playerGui.LookAtGui.Button
+        return playerGui.LookAtGui.Frame.Button
     end
 
     local screenGui = Instance.new("ScreenGui")
@@ -67,20 +65,77 @@ local function createGui()
     screenGui.ResetOnSpawn = false
     screenGui.Parent = playerGui
 
+    local frame = Instance.new("Frame")
+    frame.Name = "Frame"
+    frame.Size = UDim2.new(0, 170, 0, 70)
+    frame.Position = UDim2.new(0, 20, 0, 20)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+
     local button = Instance.new("TextButton")
     button.Name = "Button"
-    button.Size = UDim2.new(0, 150, 0, 50)
-    button.Position = UDim2.new(0, 20, 0, 20)
+    button.Size = UDim2.new(1, -20, 1, -20)
+    button.Position = UDim2.new(0, 10, 0, 10)
     button.Text = "OFF"
     button.Font = Enum.Font.SourceSansBold
     button.TextScaled = true
     button.TextColor3 = Color3.new(1, 1, 1)
     button.BackgroundColor3 = Color3.new(1, 0, 0)
-    button.Parent = screenGui
+    button.Parent = frame
 
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 10)
+    buttonCorner.Parent = button
+
+    -- Toggle
     button.MouseButton1Click:Connect(function()
         isActive = not isActive
         button.Text = isActive and "ON" or "OFF"
+    end)
+
+    --------------------------------------------------
+    -- DRAG SYSTEM (PC + MOBILE)
+    --------------------------------------------------
+    local dragging = false
+    local dragStart, startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and
+           (input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch) then
+            update(input)
+        end
     end)
 
     return button
@@ -105,9 +160,6 @@ RunService.RenderStepped:Connect(function()
     -- RGB effect
     if button then
         local t = tick()
-        local r = (math.sin(t * 2) + 1) / 2
-        local g = (math.sin(t * 2 + 2) + 1) / 2
-        local b = (math.sin(t * 2 + 4) + 1) / 2
-        button.BackgroundColor3 = Color3.new(r, g, b)
+        button.BackgroundColor3 = Color3.fromHSV((t * 0.2) % 1, 1, 1)
     end
 end)
