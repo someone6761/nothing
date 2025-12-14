@@ -1,0 +1,113 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+-- States
+local isActive = false
+local humanoidRootPart = nil
+local targetRootPart = nil
+
+--------------------------------------------------
+-- CHARACTER RESPAWN
+--------------------------------------------------
+local function onCharacterAdded(character)
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+end
+
+player.CharacterAdded:Connect(onCharacterAdded)
+if player.Character then
+    onCharacterAdded(player.Character)
+end
+
+--------------------------------------------------
+-- BOSS RESPAWN DETECTION
+--------------------------------------------------
+local function updateBoss()
+    local boss = Workspace:FindFirstChild("SamBoss")
+    if boss and boss:FindFirstChild("HumanoidRootPart") then
+        targetRootPart = boss.HumanoidRootPart
+    else
+        targetRootPart = nil
+    end
+end
+
+-- Check when boss is added again
+Workspace.ChildAdded:Connect(function(child)
+    if child.Name == "SamBoss" then
+        task.wait(0.1)
+        updateBoss()
+    end
+end)
+
+-- Also update if boss is removed (dies)
+Workspace.ChildRemoved:Connect(function(child)
+    if child.Name == "SamBoss" then
+        targetRootPart = nil
+    end
+end)
+
+-- Initial check
+updateBoss()
+
+--------------------------------------------------
+-- GUI (PERSISTENT)
+--------------------------------------------------
+local function createGui()
+    local playerGui = player:WaitForChild("PlayerGui")
+
+    if playerGui:FindFirstChild("LookAtGui") then
+        return playerGui.LookAtGui.Button
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "LookAtGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = playerGui
+
+    local button = Instance.new("TextButton")
+    button.Name = "Button"
+    button.Size = UDim2.new(0, 150, 0, 50)
+    button.Position = UDim2.new(0, 20, 0, 20)
+    button.Text = "OFF"
+    button.Font = Enum.Font.SourceSansBold
+    button.TextScaled = true
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.BackgroundColor3 = Color3.new(1, 0, 0)
+    button.Parent = screenGui
+
+    button.MouseButton1Click:Connect(function()
+        isActive = not isActive
+        button.Text = isActive and "ON" or "OFF"
+    end)
+
+    return button
+end
+
+local button = createGui()
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+RunService.RenderStepped:Connect(function()
+    -- Look at boss
+    if isActive and humanoidRootPart and targetRootPart then
+        local direction = (targetRootPart.Position - humanoidRootPart.Position).Unit
+        humanoidRootPart.CFrame =
+            CFrame.new(humanoidRootPart.Position, humanoidRootPart.Position + direction)
+
+        camera.CFrame =
+            CFrame.new(camera.CFrame.Position, targetRootPart.Position)
+    end
+
+    -- RGB effect
+    if button then
+        local t = tick()
+        local r = (math.sin(t * 2) + 1) / 2
+        local g = (math.sin(t * 2 + 2) + 1) / 2
+        local b = (math.sin(t * 2 + 4) + 1) / 2
+        button.BackgroundColor3 = Color3.new(r, g, b)
+    end
+end)
